@@ -1,35 +1,41 @@
 [[lsd-hub-install]]
-= Hub XMLRPC API Deployment
+= Hub Installation with xmlrpc
 
-Before you begin, you need to install the ``hub-xmlrpc-api`` package, and configure the Hub Server to use the API.
+Before you begin, you need to install SUSE Manager using the parameter --hubxmlrpc-replicas 1.
+eg.:
 
+``mgradm install podman suma.example.com --hubxmlrpc-replicas 1.``
 
+You can use 3rd party certificates for the peripheral servers or let the command ``rhn-ssl-tool`` to generate this certificates.
 
-.Procedure: Installing and Configuring the Hub XMLRPC API
-. On the Hub Server, or on a host that has access to all peripheral servers' XMLRPC APIs, install the ``hub-xmlrpc-api`` package.
-    The package is available in the {productname} {productnumber} repositories.
-. OPTIONAL: Set the Hub XMLRPC API service to start automatically at boot time, and start it immediately:
-+
-----
-sudo systemctl enable hub-xmlrpc-api.service
-sudo systemctl start hub-xmlrpc-api.service
-----
+.Procedure with 3rd party certificates:
+1. Install the hub server
+2. You should have 1 certificate for every peripheral server(eg.: server.crt) and a key (eg.: server.key)
+3. And you will also need a CA Certificate.
+4. On every peripheral server, copy the same CA to /etc/pki/trust/anchors/ and run ``update-ca-certificates``
+5. You can now install SUSE Manager using the following command line(Replace appropriately the names of the certificates):
 
-. OPTIONAL: Check that these parameters in the [path]``/etc/hub/hub.conf`` configuration file are correct:
-*  ``HUB_API_URL``: URL to the Hub Server XMLRPC API endpoint.
-    Use the default value if you are installing `hub-xmlrpc-api` on the Hub Server.
-* ``HUB_CONNECT_TIMEOUT``: the maximum number of seconds to wait for a response when connecting to a Server.
-    Use the default value in most cases.
-* ``HUB_REQUEST_TIMEOUT``: the maximum number of seconds to wait for a response when calling a Server method.
-    Use the default value in most cases.
-* ``HUB_CONNECT_USING_SSL``: use HTTPS instead of HTTP for communicating with peripheral Servers.
-    Recommended for a secure environment.
-
-. Restart services to pick up configuration changes.
+``mgradm  install podman --ssl-ca-root CA-Certificate.crt --ssl-server-cert server.crt --ssl-server-key server.key``
 
 
-[NOTE]
-====
-To use HTTPS to connect to peripheral Servers, you must set the ``HUB_CONNECT_USING_SSL`` parameter to ``true``, and ensure that the SSL certificates for all the peripheral Servers are installed on the machine where the ``hub-xmlrpc-api`` service runs.
-Do this by copying the ``RHN-ORG-TRUSTED-SSL-CERT`` certificate file from each peripheral Server's [path]``http://<server-url>/pub/`` directory to [path]``/etc/pki/trust/anchors/``, and run [command]``update-ca-certificates``.
-====
+.Procedure to generate the certificates with rhn-ssl-tool: 
+1. Install the hub server
+2. On the hub server enter the hub container with ``mgrctl exec -ti /bin/sh``
+3. Run ``rhn-ssl-tool`` for every pheripheral server
+eg.:
+
+``
+rhn-ssl-tool --gen-server --dir="/root/ssl-build" --set-country="COUNTRY" \
+--set-state="STATE" --set-city="CITY" --set-org="ORGANIZATION" \
+--set-org-unit="ORGANIZATION UNIT" --set-email="name@example.com" \
+--set-hostname=<hostname> --set-cname="example.com"
+``
+
+4. On every peripheral server
+
+4.1. Copy ``/root/ssl-build/RHN-ORG-TRUSTED-SSL-CERT`` and  ``/root/ssl-build/<hostname>/server.crt`` and ``/root/ssl-build/<hostname>/server.key`` to peripheral server host
+4.2. On every peripheral server, copy ``RHN-ORG-TRUSTED-SSL-CERT`` to ``/etc/pki/trust/anchors/`` and run ``update-ca-certificates``
+4.3. Install SUSE Manager with  ``mgradm install podman --ssl-ca-root RHN-ORG-TRUSTED-SSL-CERT --ssl-server-cert server.crt --ssl-server-key server.key``
+4.4. Register the peripheral server to the hub server
+
+``mgradm hub register --api-password <hub password> --api-server <hub fqdn> --api-user <hub admin>``
